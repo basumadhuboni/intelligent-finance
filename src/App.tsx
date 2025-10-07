@@ -1,6 +1,7 @@
 import { Outlet, Link, useNavigate } from 'react-router-dom';
 import { getToken, logout } from './lib/api';
 
+
 export default function App() {
   const token = getToken();
   const navigate = useNavigate();
