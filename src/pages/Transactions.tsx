@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import { api } from '../lib/api'
+import { toast } from 'sonner' // NEW IMPORT
 
 type Tx = {
   id: string
@@ -34,7 +35,57 @@ export default function Transactions() {
       const res = await api.post('/api/transactions', payload)
       return res.data as Tx
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['transactions'] }),
+    onSuccess: async (newTransaction) => {
+      qc.invalidateQueries({ queryKey: ['transactions'] })
+      
+      // NEW CODE - Check budget after adding expense
+      if (newTransaction.type === 'EXPENSE') {
+        try {
+          const budgetRes = await api.get('/api/budget/status')
+          const budgetData = budgetRes.data as {
+            monthlyBudget: number
+            spent: number
+            remaining: number
+            percentageUsed: number
+            isOverBudget: boolean
+            month: string
+          }
+          
+          qc.invalidateQueries({ queryKey: ['budget-status'] })
+          
+          if (budgetData.monthlyBudget > 0) {
+            if (budgetData.isOverBudget) {
+              toast.error(
+                `⚠️ Budget Alert: You've exceeded your monthly budget by $${Math.abs(budgetData.remaining).toLocaleString()}!`,
+                { duration: 6000 }
+              )
+            } else if (budgetData.percentageUsed > 90) {
+              toast.warning(
+                `⚠️ Budget Alert: Only $${budgetData.remaining.toLocaleString()} remaining (${Math.round(100 - budgetData.percentageUsed)}% of budget left)`,
+                { duration: 5000 }
+              )
+            } else if (budgetData.percentageUsed > 75) {
+              toast.info(
+                `💰 Budget Update: $${budgetData.remaining.toLocaleString()} remaining this month (${Math.round(100 - budgetData.percentageUsed)}% left)`,
+                { duration: 4000 }
+              )
+            } else {
+              toast.success(
+                `✓ Transaction added! $${budgetData.remaining.toLocaleString()} remaining in your monthly budget`,
+                { duration: 3000 }
+              )
+            }
+          } else {
+            toast.success('Transaction added successfully!')
+          }
+        } catch (error) {
+          // If budget check fails, just show success message
+          toast.success('Transaction added successfully!')
+        }
+      } else {
+        toast.success('Income transaction added successfully!')
+      }
+    },
   })
 
   return (

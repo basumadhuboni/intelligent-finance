@@ -1,10 +1,13 @@
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useMemo, useState } from 'react'
 import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, BarChart, Bar, XAxis, YAxis, CartesianGrid, Legend, LineChart, Line } from 'recharts'
 import { api } from '../lib/api'
+import { toast } from 'sonner' // NEW IMPORT
 
 export default function Dashboard() {
   const [range, setRange] = useState<{ from?: string; to?: string }>({})
+  const [budgetInput, setBudgetInput] = useState('') // NEW STATE
+  const qc = useQueryClient() // NEW LINE
   
   // Summary data query
   const { data, isLoading, isError } = useQuery({
@@ -49,6 +52,38 @@ export default function Dashboard() {
     },
   })
 
+  // NEW QUERY - Budget status
+  const { data: budgetData } = useQuery({
+    queryKey: ['budget-status'],
+    queryFn: async () => {
+      const res = await api.get('/api/budget/status')
+      return res.data as {
+        monthlyBudget: number
+        spent: number
+        remaining: number
+        percentageUsed: number
+        isOverBudget: boolean
+        month: string
+      }
+    },
+  })
+
+  // NEW MUTATION - Set budget
+  const setBudget = useMutation({
+    mutationFn: async (monthlyBudget: number) => {
+      const res = await api.post('/api/budget/set', { monthlyBudget })
+      return res.data
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['budget-status'] })
+      toast.success('Monthly budget updated successfully!')
+      setBudgetInput('')
+    },
+    onError: () => {
+      toast.error('Failed to update budget')
+    }
+  })
+
   const pieData = useMemo(() => {
     if (!data) return [] as Array<{ name: string; value: number }>
     // Now byCategory only contains expense categories from the backend
@@ -80,6 +115,111 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-8">
+      {/* NEW SECTION - Monthly Budget Alert */}
+      {budgetData && budgetData.monthlyBudget > 0 && (
+        <div className={`rounded-2xl border-2 p-6 shadow-lg ${
+          budgetData.isOverBudget 
+            ? 'bg-gradient-to-r from-red-50 to-rose-50 border-red-300' 
+            : budgetData.percentageUsed > 80
+            ? 'bg-gradient-to-r from-amber-50 to-orange-50 border-amber-300'
+            : 'bg-gradient-to-r from-emerald-50 to-green-50 border-emerald-300'
+        }`}>
+          <div className="flex items-center justify-between flex-wrap gap-4">
+            <div>
+              <h3 className={`text-lg font-bold mb-1 ${
+                budgetData.isOverBudget ? 'text-red-800' : budgetData.percentageUsed > 80 ? 'text-amber-800' : 'text-emerald-800'
+              }`}>
+                {budgetData.month} Budget Status
+              </h3>
+              <p className={`text-sm font-medium ${
+                budgetData.isOverBudget ? 'text-red-700' : budgetData.percentageUsed > 80 ? 'text-amber-700' : 'text-emerald-700'
+              }`}>
+                {budgetData.isOverBudget 
+                  ? `⚠️ Over budget by $${Math.abs(budgetData.remaining).toLocaleString()}`
+                  : `✓ Remaining: $${budgetData.remaining.toLocaleString()} of $${budgetData.monthlyBudget.toLocaleString()}`
+                }
+              </p>
+            </div>
+            <div className="flex items-center gap-6">
+              <div className="text-right">
+                <div className="text-2xl font-bold text-slate-800">${budgetData.spent.toLocaleString()}</div>
+                <div className="text-xs font-medium text-slate-600">Spent ({budgetData.percentageUsed}%)</div>
+              </div>
+              <div className="w-32 h-32 relative">
+                <svg className="transform -rotate-90 w-32 h-32">
+                  <circle
+                    cx="64"
+                    cy="64"
+                    r="56"
+                    stroke="#e2e8f0"
+                    strokeWidth="12"
+                    fill="transparent"
+                  />
+                  <circle
+                    cx="64"
+                    cy="64"
+                    r="56"
+                    stroke={budgetData.isOverBudget ? '#ef4444' : budgetData.percentageUsed > 80 ? '#f59e0b' : '#10b981'}
+                    strokeWidth="12"
+                    fill="transparent"
+                    strokeDasharray={`${2 * Math.PI * 56}`}
+                    strokeDashoffset={`${2 * Math.PI * 56 * (1 - Math.min(budgetData.percentageUsed / 100, 1))}`}
+                    strokeLinecap="round"
+                  />
+                </svg>
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <span className={`text-xl font-bold ${
+                    budgetData.isOverBudget ? 'text-red-700' : budgetData.percentageUsed > 80 ? 'text-amber-700' : 'text-emerald-700'
+                  }`}>
+                    {Math.round(budgetData.percentageUsed)}%
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* NEW SECTION - Set Monthly Budget */}
+      <div className="bg-white/90 backdrop-blur rounded-2xl shadow-lg border border-slate-200/50 p-8">
+        <h2 className="text-xl font-bold text-slate-800 mb-6 flex items-center gap-3">
+          <span className="w-1.5 h-8 bg-gradient-to-b from-purple-600 to-purple-800 rounded-full"></span>
+          Monthly Expense Budget
+        </h2>
+        <div className="flex gap-4 items-end">
+          <div className="flex-1">
+            <label className="block text-sm font-semibold text-slate-700 mb-3">Set Your Monthly Budget Target</label>
+            <input 
+              type="number" 
+              step="0.01"
+              placeholder={budgetData?.monthlyBudget ? `Current: $${budgetData.monthlyBudget}` : "Enter amount (e.g., 2000)"}
+              className="w-full px-5 py-3 rounded-xl border-2 border-slate-200 focus:border-purple-500 focus:ring-4 focus:ring-purple-100 outline-none transition-all bg-white text-slate-900" 
+              value={budgetInput}
+              onChange={(e) => setBudgetInput(e.target.value)}
+            />
+          </div>
+          <button 
+            className="px-8 py-3 rounded-xl bg-gradient-to-r from-purple-600 to-purple-700 text-white font-bold hover:from-purple-700 hover:to-purple-800 transition-all shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
+            onClick={() => {
+              const amount = parseFloat(budgetInput)
+              if (!isNaN(amount) && amount >= 0) {
+                setBudget.mutate(amount)
+              } else {
+                toast.error('Please enter a valid amount')
+              }
+            }}
+            disabled={setBudget.isPending || !budgetInput}
+          >
+            {setBudget.isPending ? 'Saving...' : 'Set Budget'}
+          </button>
+        </div>
+        {budgetData && budgetData.monthlyBudget > 0 && (
+          <p className="text-sm text-slate-600 mt-3 font-medium">
+            Current monthly budget: ${budgetData.monthlyBudget.toLocaleString()} • You've spent ${budgetData.spent.toLocaleString()} this month
+          </p>
+        )}
+      </div>
+
       <div className="bg-white/90 backdrop-blur rounded-2xl shadow-lg border border-slate-200/50 p-8">
         <h2 className="text-xl font-bold text-slate-800 mb-6 flex items-center gap-3">
           <span className="w-1.5 h-8 bg-gradient-to-b from-blue-600 to-blue-800 rounded-full"></span>

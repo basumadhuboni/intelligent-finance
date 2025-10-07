@@ -15,8 +15,8 @@ model User {
   email         String        @unique
   passwordHash  String
   name          String?
+  monthlyBudget Decimal?      @default(0)  // ← ADD THIS LINE
   createdAt     DateTime      @default(now())
-  updatedAt     DateTime      @updatedAt
   transactions  Transaction[]
 }
 
