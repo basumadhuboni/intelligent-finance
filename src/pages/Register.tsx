@@ -4,7 +4,11 @@ import { zodResolver } from '@hookform/resolvers/zod'
 import { useNavigate } from 'react-router-dom'
 import { api } from '../lib/api'
 
-const schema = z.object({ email: z.string().email(), password: z.string().min(6), name: z.string().optional() })
+const schema = z.object({
+  email: z.string().trim().min(6, 'Email must be at least 6 characters').email('Invalid email address'),
+  password: z.string().min(6),
+  name: z.string().trim().regex(/^[^0-9]*$/, 'Name cannot contain numbers').optional()
+})
 type Form = z.infer<typeof schema>
 
 export default function Register() {

@@ -8,13 +8,17 @@ const prisma = new PrismaClient();
 const router = Router();
 
 const registerSchema = z.object({
-  email: z.string().email(),
+  email: z.string().trim().min(6, 'Email must be at least 6 characters').email(),
   password: z.string().min(6),
-  name: z.string().optional(),
+  name: z
+    .string()
+    .trim()
+    .regex(/^[^0-9]*$/, 'Name cannot contain numbers')
+    .optional(),
 });
 
 const loginSchema = z.object({
-  email: z.string().email(),
+  email: z.string().trim().min(6, 'Email must be at least 6 characters').email(),
   password: z.string().min(6),
 });
 

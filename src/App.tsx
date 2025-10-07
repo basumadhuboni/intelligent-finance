@@ -7,7 +7,9 @@ export default function App() {
   const navigate = useNavigate();
   
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-slate-100">
+    <div className="min-h-screen bg-gradient-to-br from-blue-100 via-blue-200 to-blue-300 relative">
+      {/* subtle noise/texture overlay for stronger glass feel */}
+      <div className="pointer-events-none fixed inset-0 opacity-10 mix-blend-overlay bg-[radial-gradient(circle_at_1px_1px,_rgba(255,255,255,0.8)_1px,_transparent_1.2px)] [background-size:8px_8px]" />
       <header className="border-b border-slate-200 bg-white/80 backdrop-blur-sm shadow-sm sticky top-0 z-50">
         <div className="mx-auto max-w-7xl px-6 py-4 flex items-center justify-between">
           <Link to="/" className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-blue-800 bg-clip-text text-transparent hover:from-blue-700 hover:to-blue-900 transition-all">
