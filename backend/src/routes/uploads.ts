@@ -297,6 +297,49 @@ router.post('/statement', requireAuth, upload.single('file'), async (req: AuthRe
   }
 });
 
+// Helper function to clean and truncate text for AI processing
+function cleanTextForAI(text: string, maxLength: number = 4000): string {
+  // Remove excessive whitespace
+  let cleaned = text.replace(/\s+/g, ' ').trim();
+  
+  // Remove special characters that might confuse AI
+  cleaned = cleaned.replace(/[^\w\s\$\.\-\,\:\(\)\/]/g, ' ');
+  
+  // Truncate if too long (keep first part as it usually has the important info)
+  if (cleaned.length > maxLength) {
+    cleaned = cleaned.substring(0, maxLength) + '... [text truncated]';
+    console.log(`⚠️ Text truncated from ${text.length} to ${maxLength} characters`);
+  }
+  
+  return cleaned;
+}
+
+// Retry logic for API calls
+async function retryWithBackoff<T>(
+  fn: () => Promise<T>,
+  maxRetries: number = 3,
+  baseDelay: number = 1000
+): Promise<T> {
+  for (let i = 0; i < maxRetries; i++) {
+    try {
+      return await fn();
+    } catch (error: any) {
+      const isLastAttempt = i === maxRetries - 1;
+      const isRetryableError = error?.status === 503 || error?.status === 429 || error?.code === 'UNAVAILABLE';
+      
+      if (isLastAttempt || !isRetryableError) {
+        throw error;
+      }
+      
+      const delay = baseDelay * Math.pow(2, i); // Exponential backoff
+      console.log(`⏳ Retry attempt ${i + 1}/${maxRetries} after ${delay}ms...`);
+      await new Promise(resolve => setTimeout(resolve, delay));
+    }
+  }
+  
+  throw new Error('Max retries exceeded');
+}
+
 // AI Receipt Analyzer - Extract text and analyze with Gemini
 router.post('/ai-receipt', requireAuth, upload.single('file'), async (req: AuthRequest, res) => {
   try {
@@ -305,11 +348,14 @@ router.post('/ai-receipt', requireAuth, upload.single('file'), async (req: AuthR
     const mime = req.file.mimetype;
     let text = '';
     
+    console.log('📄 Processing file:', mime, req.file.size, 'bytes');
+    
     // Extract text from file (same logic as receipt endpoint)
     if (mime === 'application/pdf') {
       try {
         const data = await pdf(req.file.buffer);
         text = data.text;
+        console.log('📄 PDF text extracted:', text.length, 'characters');
       } catch (error) {
         console.error('PDF parsing error:', error);
         return res.status(500).json({ error: 'Failed to parse PDF file' });
@@ -323,6 +369,7 @@ router.post('/ai-receipt', requireAuth, upload.single('file'), async (req: AuthR
         const { data: { text: ocrText } } = await worker.recognize(req.file.buffer as any);
         await worker.terminate();
         text = ocrText;
+        console.log('📸 Image text extracted:', text.length, 'characters');
       } catch (error) {
         console.error('OCR processing error:', error);
         return res.status(500).json({ error: 'Failed to process image with OCR' });
@@ -333,9 +380,11 @@ router.post('/ai-receipt', requireAuth, upload.single('file'), async (req: AuthR
       return res.status(400).json({ error: 'No text could be extracted from the file' });
     }
     
-    console.log('📄 Extracted text for AI analysis:', text.substring(0, 200));
+    // Clean and truncate text for AI
+    const cleanedText = cleanTextForAI(text, 3500); // Leave room for prompt
+    console.log('🧹 Cleaned text for AI:', cleanedText.length, 'characters');
     
-    // Call Gemini API to analyze the receipt
+    // Call Gemini API to analyze the receipt with retry logic
     const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
     if (!GEMINI_API_KEY) {
       return res.status(500).json({ error: 'GEMINI_API_KEY not configured in environment variables' });
@@ -355,43 +404,57 @@ Return ONLY valid JSON array format like this:
 
 Receipt text:
 """
-${text}
+${cleanedText}
 """`;
 
     try {
+      // Use gemini-2.0-flash-exp (original model)
       const modelName = 'gemini-2.0-flash-exp';
       const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent`;
       
-      const response = await fetch(endpoint, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-goog-api-key': GEMINI_API_KEY,
-        },
-        body: JSON.stringify({
-          contents: [{
-            parts: [{
-              text: prompt
-            }]
-          }]
-        })
-      });
+      console.log('🤖 Calling Gemini API with model:', modelName);
       
-      if (!response.ok) {
-        const errorData = await response.text();
-        console.error('Gemini API error:', errorData);
-        return res.status(500).json({ error: 'Failed to analyze receipt with AI' });
-      }
+      const result = await retryWithBackoff(async () => {
+        const response = await fetch(endpoint, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'x-goog-api-key': GEMINI_API_KEY,
+          },
+          body: JSON.stringify({
+            contents: [{
+              parts: [{
+                text: prompt
+              }]
+            }],
+            generationConfig: {
+              temperature: 0.1,
+              maxOutputTokens: 2048
+            }
+          })
+        });
+        
+        if (!response.ok) {
+          const errorData = await response.json();
+          console.error('❌ Gemini API error:', JSON.stringify(errorData, null, 2));
+          
+          const error: any = new Error(errorData.error?.message || 'Gemini API request failed');
+          error.status = errorData.error?.code || response.status;
+          error.code = errorData.error?.status;
+          throw error;
+        }
+        
+        return response.json();
+      }, 3, 2000); // 3 retries with 2 second base delay
       
-      const result = await response.json();
-      console.log('🤖 Gemini response:', JSON.stringify(result, null, 2));
+      console.log('✅ Gemini API response received');
       
       const aiText = result.candidates?.[0]?.content?.parts?.[0]?.text;
       if (!aiText) {
         return res.status(500).json({ error: 'No response from AI' });
       }
       
-      console.log('🧩 Gemini raw output:', aiText);
+      console.log('🧩 Gemini raw output:', aiText.substring(0, 200) + '...');
       
       // Extract JSON from the response (Gemini sometimes wraps it in markdown)
       let jsonText = aiText.trim();
@@ -407,6 +470,8 @@ ${text}
         return res.status(500).json({ error: 'AI returned invalid format' });
       }
       
+      console.log('✅ Successfully parsed:', transactions.length, 'transactions');
+      
       // Validate and format transactions
       const validatedTransactions = transactions.map((t: any) => ({
         date: t.date || new Date().toISOString().split('T')[0],
@@ -418,17 +483,34 @@ ${text}
       
       // Return extracted transactions for user review
       res.json({ 
-        extractedText: text,
+        extractedText: text.substring(0, 500) + (text.length > 500 ? '...' : ''),
         transactions: validatedTransactions
       });
       
-    } catch (error) {
-      console.error('AI analysis error:', error);
-      return res.status(500).json({ error: 'Failed to parse AI response: ' + (error as Error).message });
+    } catch (error: any) {
+      console.error('❌ AI analysis error:', error);
+      
+      // Provide helpful error messages
+      if (error.code === 'UNAVAILABLE' || error.status === 503) {
+        return res.status(503).json({ 
+          error: 'AI service is temporarily overloaded. Please try again in a few moments.',
+          retryable: true
+        });
+      } else if (error.status === 429) {
+        return res.status(429).json({ 
+          error: 'Rate limit exceeded. Please wait a moment before trying again.',
+          retryable: true
+        });
+      } else {
+        return res.status(500).json({ 
+          error: 'Failed to analyze receipt with AI: ' + (error.message || 'Unknown error'),
+          details: 'Please try uploading a clearer image or PDF'
+        });
+      }
     }
     
   } catch (error) {
-    console.error('AI receipt upload error:', error);
+    console.error('❌ AI receipt upload error:', error);
     res.status(500).json({ error: 'Internal server error during AI receipt processing' });
   }
 });
