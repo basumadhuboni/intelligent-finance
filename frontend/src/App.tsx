@@ -13,7 +13,7 @@ export default function App() {
       <header className="border-b border-slate-200 bg-white/80 backdrop-blur-sm shadow-sm sticky top-0 z-50">
         <div className="mx-auto max-w-7xl px-6 py-4 flex items-center justify-between">
           <Link to="/" className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-blue-800 bg-clip-text text-transparent hover:from-blue-700 hover:to-blue-900 transition-all">
-            Personal Finance
+             FinSmart
           </Link>
           <nav className="flex gap-1 text-sm items-center">
             {token ? (
