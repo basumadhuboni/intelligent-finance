@@ -164,8 +164,7 @@ cp .env.example .env
 # JWT_SECRET="your-secret-key"
 # GEMINI_API_KEY="your-gemini-api-key"
 
-npm run prisma:migrate
-npm run prisma:generate
+npx prisma generate
 npm run dev
 ```
 
@@ -228,15 +227,15 @@ PORT=4000
 
 ### Authentication
 
-| Method | Endpoint             | Description   |
-| ------ | -------------------- | ------------- |
+| Method | Endpoint               | Description   |
+| ------ | ---------------------- | ------------- |
 | POST   | `/api/auth/register` | Register user |
 | POST   | `/api/auth/login`    | Login user    |
 
 ### Transactions
 
-| Method | Endpoint                    | Description             |
-| ------ | --------------------------- | ----------------------- |
+| Method | Endpoint                      | Description             |
+| ------ | ----------------------------- | ----------------------- |
 | GET    | `/api/transactions`         | Fetch user transactions |
 | POST   | `/api/transactions`         | Add new transaction     |
 | PUT    | `/api/transactions/:id`     | Update transaction      |
@@ -246,15 +245,15 @@ PORT=4000
 
 ### Budgets
 
-| Method | Endpoint             | Description                 |
-| ------ | -------------------- | --------------------------- |
+| Method | Endpoint               | Description                 |
+| ------ | ---------------------- | --------------------------- |
 | POST   | `/api/budget/set`    | Define monthly budget       |
 | GET    | `/api/budget/status` | Fetch current budget status |
 
 ### AI & Files
 
-| Method | Endpoint                  | Description                  |
-| ------ | ------------------------- | ---------------------------- |
+| Method | Endpoint                    | Description                  |
+| ------ | --------------------------- | ---------------------------- |
 | POST   | `/api/uploads/receipt`    | Upload basic receipt         |
 | POST   | `/api/uploads/ai-receipt` | AI-enhanced receipt analysis |
 | POST   | `/api/uploads/statement`  | Bank statement import        |
