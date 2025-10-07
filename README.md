@@ -5,6 +5,17 @@
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.0-blue.svg)](https://www.typescriptlang.org/)
 [![Prisma](https://img.shields.io/badge/Prisma-5.0-purple.svg)](https://www.prisma.io/)
 
+<p align="center">
+  <a href="https://drive.google.com/file/d/1ZKnbMKroh0m0CbB7_QVuAJc-0YRB5y1d/view?usp=sharing" target="_blank">
+    <img src="https://drive.google.com/thumbnail?id=1hKhKh3TvsBeqXSTkIUf97VXsZp76phLN" 
+         alt="Demo video of the working app" 
+         width="200" 
+         style="border-radius:12px; box-shadow:0 4px 10px rgba(0,0,0,0.15);" />
+  </a>
+</p>
+
+**Demo Video Link:** [https://drive.google.com/file/d/1ZKnbMKroh0m0CbB7_QVuAJc-0YRB5y1d/view?usp=sharing](https://drive.google.com/file/d/1ZKnbMKroh0m0CbB7_QVuAJc-0YRB5y1d/view?usp=sharing)
+
 **Repository:** [https://github.com/basumadhuboni/intelligent-finance](https://github.com/basumadhuboni/intelligent-finance)
 
 ---
