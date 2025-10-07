@@ -27,6 +27,9 @@ export default function App() {
                 <Link to="/upload" className="px-5 py-2.5 rounded-lg text-slate-700 hover:bg-blue-50 hover:text-blue-700 transition-all font-medium">
                   Import
                 </Link>
+                <Link to="/chatbot" className="px-5 py-2.5 rounded-lg text-slate-700 hover:bg-blue-50 hover:text-blue-700 transition-all font-medium">
+                  Chatbot
+                </Link>
                 <button 
                   className="ml-3 px-5 py-2.5 rounded-lg border border-slate-300 text-slate-700 hover:bg-slate-50 hover:border-slate-400 transition-all font-medium"
                   onClick={() => logout()}

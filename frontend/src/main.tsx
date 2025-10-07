@@ -11,6 +11,7 @@ import Protected from './components/Protected.tsx';
 const Dashboard = React.lazy(() => import('./pages/Dashboard.tsx'));
 const Transactions = React.lazy(() => import('./pages/Transactions.tsx'));
 const Upload = React.lazy(() => import('./pages/Upload.tsx'));
+const Chatbot = React.lazy(() => import('./pages/Chatbot.tsx'));
 const Login = React.lazy(() => import('./pages/Login.tsx'));
 const Register = React.lazy(() => import('./pages/Register.tsx'));
 
@@ -26,6 +27,7 @@ const router = createBrowserRouter([
           { path: 'dashboard', element: <Dashboard /> },
           { path: 'transactions', element: <Transactions /> },
           { path: 'upload', element: <Upload /> },
+          { path: 'chatbot', element: <Chatbot /> },
         ],
       },
       { path: 'login', element: <Login /> },
